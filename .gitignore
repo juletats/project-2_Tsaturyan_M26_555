@@ -1,6 +1,21 @@
- .idea/
- .venv
- dist/
- __pycache__/
- *.egg-info
- 
+# IDE
+.idea/
+# Виртуальное окружение
+.venv/
+venv/
+
+# Артефакты сборки и дистрибуции
+build/
+dist/
+*.egg-info/
+
+# Кэш Python
+__pycache__/
+*.py[cod]
+
+# Данные базы, создаваемые во время работы
+db_meta.json
+data/
+
+# Записи терминала
+*.cast

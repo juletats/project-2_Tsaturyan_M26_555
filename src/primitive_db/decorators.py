@@ -1,14 +1,17 @@
 import time
-from functools import wraps
+
+
+def copy_meta(wrapper, func):
+    wrapper.__name__ = func.__name__
+    wrapper.__doc__ = func.__doc__
+    return wrapper
 
 
 def handle_db_errors(func):
-    """Централизованно перехватывает исключения операций с базой данных.
-
-    Сообщение об ошибке печатается здесь, функция возвращает None.
+    """ Централизованно перехватывает исключения операций с базой данных.
+        Сообщение об ошибке печатается здесь, функция возвращает None.
     """
 
-    @wraps(func)
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -23,17 +26,15 @@ def handle_db_errors(func):
             print(f"Произошла непредвиденная ошибка: {e}")
         return None
 
-    return wrapper
+    return copy_meta(wrapper, func)
 
 
 def confirm_action(action_name):
-    """Фабрика декораторов, запрашивающих подтверждение опасной операции.
-
-    Если пользователь ввёл не "y", операция отменяется и возвращается None.
+    """ Фабрика декораторов, запрашивающих подтверждение опасной операции.
+        Если пользователь ввёл не "y", операция отменяется и возвращается None.
     """
 
     def decorator(func):
-        @wraps(func)
         def wrapper(*args, **kwargs):
             question = (f'Вы уверены, что хотите выполнить '
                         f'"{action_name}"? [y/n]: ')
@@ -49,23 +50,23 @@ def confirm_action(action_name):
 
             return func(*args, **kwargs)
 
-        return wrapper
+        return copy_meta(wrapper, func)
 
     return decorator
 
 
 def log_time(func):
     """ Замеряет время выполнения функции и печатает его в консоль."""
+    func_name = func.__name__
 
-    @wraps(func)
     def wrapper(*args, **kwargs):
         start = time.monotonic()
         result = func(*args, **kwargs)
         elapsed = time.monotonic() - start
-        print(f"Функция {func.__name__} выполнилась за {elapsed:.3f} секунд.")
+        print(f"Функция {func_name} выполнилась за {elapsed:.3f} секунд.")
         return result
 
-    return wrapper
+    return copy_meta(wrapper, func)
 
 
 def create_cacher():
@@ -76,6 +77,7 @@ def create_cacher():
     cache = {}
 
     def cache_result(key, value_func):
+        """ Возвращает значение из кэша, а при промахе — вычисляет value_func."""
         if key not in cache:
             cache[key] = value_func()
         return cache[key]

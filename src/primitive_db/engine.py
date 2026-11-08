@@ -2,6 +2,13 @@ import shlex
 
 from prettytable import PrettyTable
 
+from primitive_db.constants import (
+    COLUMNS_KEY,
+    ID_COLUMN,
+    MENU_SECTIONS,
+    MENU_TITLE,
+    META_FILE,
+)
 from primitive_db.core import (
     create_table,
     delete,
@@ -28,30 +35,6 @@ from primitive_db.utils import (
     save_table_data,
 )
 
-META_FILE = "db_meta.json"
-
-MENU_TITLE = "***<База данных>***"
-
-MENU_SECTIONS = (
-    ("Управление таблицами", (
-        "<command> create_table <имя_таблицы> <столбец1:тип> .. - создать таблицу",
-        "<command> list_tables - показать список всех таблиц",
-        "<command> drop_table <имя_таблицы> - удалить таблицу",
-    )),
-    ("Операции с данными", (
-        "<command> insert into <имя_таблицы> values (..) - создать запись",
-        "<command> select from <имя_таблицы> where .. - прочитать по условию",
-        "<command> select from <имя_таблицы> - прочитать все записи",
-        "<command> update <имя_таблицы> set .. where .. - обновить запись",
-        "<command> delete from <имя_таблицы> where .. - удалить запись",
-        "<command> info <имя_таблицы> - информация о таблице",
-    )),
-    ("Общие команды", (
-        "<command> exit - выход из программы",
-        "<command> help - справочная информация",
-    )),
-)
-
 cache_result = create_cacher()
 
 
@@ -66,7 +49,7 @@ def print_help():
 
 def format_ids(rows):
     """ Форматирует ID записей в строку вида: '1, 2'"""
-    return ", ".join(str(row["ID"]) for row in rows)
+    return ", ".join(str(row[ID_COLUMN]) for row in rows)
 
 
 def failed(result):
@@ -122,7 +105,7 @@ def load_table(metadata, table_name):
     if table_name not in metadata:
         return f'Ошибка: Таблица "{table_name}" не существует.'
 
-    columns = metadata[table_name]["columns"]
+    columns = metadata[table_name][COLUMNS_KEY]
     return columns, convert_types(load_table_data(table_name), columns)
 
 
@@ -182,7 +165,7 @@ def handle_create_table(metadata, args):
     if failed(result):
         return metadata
 
-    columns_str = format_columns(result[table_name]["columns"])
+    columns_str = format_columns(result[table_name][COLUMNS_KEY])
     print(f'Таблица "{table_name}" успешно создана '
           f'со столбцами: {columns_str}')
     save_metadata(META_FILE, result)
@@ -239,7 +222,7 @@ def handle_insert(metadata, args, user_input):
 
     cache_result.clear()
     save_table_data(table_name, result)
-    print(f'Запись с ID={result[-1]["ID"]} успешно добавлена '
+    print(f'Запись с ID={result[-1][ID_COLUMN]} успешно добавлена '
           f'в таблицу "{table_name}".')
 
 

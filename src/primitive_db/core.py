@@ -1,8 +1,12 @@
+from primitive_db.constants import (
+    COLUMNS_KEY,
+    ID_COLUMN,
+    META_FILE,
+    VALID_TYPES,
+)
 from primitive_db.decorators import confirm_action, handle_db_errors, log_time
 from primitive_db.parser import parse_value
 from primitive_db.utils import load_metadata, load_table_data
-
-VALID_TYPES = {"int", "str", "bool"}
 
 
 def check_columns(columns_strs):
@@ -33,11 +37,11 @@ def create_table(metadata, table_name, columns_strs):
     columns = check_columns(columns_strs)
 
     # Проверяем, есть ли уже столбец ID
-    has_id = any(name == "ID" for name, _ in columns)
-    all_columns = columns if has_id else [("ID", "int")] + columns
+    has_id = any(name == ID_COLUMN for name, _ in columns)
+    all_columns = columns if has_id else [(ID_COLUMN, "int")] + columns
 
     metadata[table_name] = {
-        "columns": {name: col_type for name, col_type in all_columns},
+        COLUMNS_KEY: {name: col_type for name, col_type in all_columns},
     }
     return metadata
 
@@ -75,9 +79,9 @@ def insert(metadata, table_name, values):
     if table_name not in metadata:
         return f'Ошибка: Таблица "{table_name}" не существует.'
 
-    columns = metadata[table_name]["columns"]
+    columns = metadata[table_name][COLUMNS_KEY]
     # ID не учитывается при проверке количества значений
-    data_columns = {k: v for k, v in columns.items() if k != "ID"}
+    data_columns = {k: v for k, v in columns.items() if k != ID_COLUMN}
 
     if len(values) != len(data_columns):
         return (f"Некорректное значение: ожидалось "
@@ -91,9 +95,9 @@ def insert(metadata, table_name, values):
     ]
 
     data = load_table_data(table_name)
-    new_id = max((row.get("ID", 0) for row in data), default=0) + 1
+    new_id = max((row.get(ID_COLUMN, 0) for row in data), default=0) + 1
 
-    new_row = {"ID": new_id}
+    new_row = {ID_COLUMN: new_id}
     new_row.update(zip(data_col_names, converted_values))
 
     data.append(new_row)
@@ -146,11 +150,11 @@ def delete(table_data, where_clause):
 @handle_db_errors
 def info(table_name):
     """ Возвращает информацию о таблице или строку с ошибкой."""
-    metadata = load_metadata("db_meta.json")
+    metadata = load_metadata(META_FILE)
     if table_name not in metadata:
         return f'Ошибка: Таблица "{table_name}" не существует.'
 
-    columns = metadata[table_name]["columns"]
+    columns = metadata[table_name][COLUMNS_KEY]
     columns_str = format_columns(columns)
     count = len(load_table_data(table_name))
 

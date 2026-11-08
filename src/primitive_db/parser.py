@@ -1,6 +1,6 @@
 import shlex
 
-PUNCTUATION = "(),"
+from primitive_db.constants import PUNCTUATION
 
 
 def parse_values(values_str):
