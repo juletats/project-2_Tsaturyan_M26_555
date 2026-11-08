@@ -6,12 +6,14 @@ from primitive_db.core import (
     create_table,
     delete,
     drop_table,
+    format_columns,
     info,
     insert,
     list_tables,
     select,
     update,
 )
+from primitive_db.decorators import create_cacher
 from primitive_db.parser import (
     convert_types,
     parse_set,
@@ -50,6 +52,8 @@ MENU_SECTIONS = (
     )),
 )
 
+cache_result = create_cacher()
+
 
 def print_help():
     """ Печатает меню всех доступных команд."""
@@ -60,15 +64,30 @@ def print_help():
             print(line)
 
 
-def format_columns(columns):
-    """ Форматирует столбцы в строку вида: 'ID:int, name:str'"""
-    parts = [f"{name}:{col_type}" for name, col_type in columns.items()]
-    return ", ".join(parts)
-
-
 def format_ids(rows):
     """ Форматирует ID записей в строку вида: '1, 2'"""
     return ", ".join(str(row["ID"]) for row in rows)
+
+
+def failed(result):
+    """ Проверяет, что операция не выполнена.
+        None означает, что сообщение уже напечатал декоратор
+        handle_db_errors или действие отменено подтверждением;
+        строка — текст ошибки, который нужно вывести.
+    """
+    if result is None:
+        return True
+    if isinstance(result, str):
+        print(result)
+        return True
+    return False
+
+
+def select_cached(table_name, table_data, where_clause):
+    """ Выполняет select, кэшируя результат по таблице и условию."""
+    condition = tuple(sorted(where_clause.items())) if where_clause else None
+    key = (table_name, condition)
+    return cache_result(key, lambda: select(table_data, where_clause))
 
 
 def print_table(data, columns):
@@ -160,8 +179,7 @@ def handle_create_table(metadata, args):
         return metadata
 
     result = create_table(metadata, table_name, args[1:])
-    if isinstance(result, str):
-        print(result)
+    if failed(result):
         return metadata
 
     columns_str = format_columns(result[table_name]["columns"])
@@ -179,10 +197,10 @@ def handle_drop_table(metadata, args):
 
     table_name = args[0]
     result = drop_table(metadata, table_name)
-    if isinstance(result, str):
-        print(result)
+    if failed(result):
         return metadata
 
+    cache_result.clear()
     print(f'Таблица "{table_name}" успешно удалена.')
     save_metadata(META_FILE, result)
     return result
@@ -191,6 +209,8 @@ def handle_drop_table(metadata, args):
 def handle_list_tables(metadata):
     """Обрабатывает list_tables."""
     tables = list_tables(metadata)
+    if tables is None:
+        return
     if not tables:
         print("Таблицы отсутствуют.")
         return
@@ -214,10 +234,10 @@ def handle_insert(metadata, args, user_input):
         return
 
     result = insert(metadata, table_name, values)
-    if isinstance(result, str):
-        print(result)
+    if failed(result):
         return
 
+    cache_result.clear()
     save_table_data(table_name, result)
     print(f'Запись с ID={result[-1]["ID"]} успешно добавлена '
           f'в таблицу "{table_name}".')
@@ -244,7 +264,11 @@ def handle_select(metadata, args):
         return
 
     columns, table_data = loaded
-    print_table(select(table_data, where_clause), columns)
+    rows = select_cached(args[1], table_data, where_clause)
+    if rows is None:
+        return
+
+    print_table(rows, columns)
 
 
 def handle_update(metadata, args):
@@ -289,15 +313,18 @@ def handle_update(metadata, args):
         return
 
     matched = select(table_data, where_clause)
-    result = update(table_data, converted, where_clause)
-    if isinstance(result, str):
-        print(result)
+    if matched is None:
         return
 
     if not matched:
         print("Записи не найдены.")
         return
 
+    result = update(table_data, converted, where_clause)
+    if failed(result):
+        return
+
+    cache_result.clear()
     save_table_data(table_name, result)
     print(f'Запись с ID={format_ids(matched)} в таблице '
           f'"{table_name}" успешно обновлена.')
@@ -330,15 +357,18 @@ def handle_delete(metadata, args):
 
     _columns, table_data = loaded
     matched = select(table_data, where_clause)
-    result = delete(table_data, where_clause)
-    if isinstance(result, str):
-        print(result)
+    if matched is None:
         return
 
     if not matched:
         print("Записи не найдены.")
         return
 
+    result = delete(table_data, where_clause)
+    if failed(result):
+        return
+
+    cache_result.clear()
     save_table_data(table_name, result)
     print(f'Запись с ID={format_ids(matched)} успешно удалена '
           f'из таблицы "{table_name}".')

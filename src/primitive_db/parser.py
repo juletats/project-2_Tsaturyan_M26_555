@@ -17,7 +17,12 @@ def parse_value(value_str, col_type):
     Выбрасывается ValueError, если тип неизвестен или значение ему не соответствует.
     """
     if col_type == "int":
-        return int(value_str)
+        try:
+            return int(value_str)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"{value_str} не может быть преобразовано в int"
+            ) from None
     elif col_type == "bool":
         if value_str.lower() not in ("true", "false", "1", "0", "yes", "no"):
             raise ValueError(f"{value_str} не может быть bool")
